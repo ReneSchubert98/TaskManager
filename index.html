@@ -24,11 +24,6 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        return (
-        <div>
-            <h1>Test Rendering</h1>
-        </div>
-        );
         const { useState, useEffect } = React;
 
         const dbPromise = idb.openDB('task-manager-db', 1, {
@@ -49,6 +44,11 @@
 
         function TaskManager() {
             const [tasks, setTasks] = useState({});
+            return (
+            <div>
+                <h1>Test Rendering</h1>
+            </div>
+            );
             const [currentWeek, setCurrentWeek] = useState(getCurrentWeek());
             const [newTask, setNewTask] = useState({ feature: '', description: '', priority: 'Niedrig', dueDate: '' });
             const [quote, setQuote] = useState('');
