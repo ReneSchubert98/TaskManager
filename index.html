@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>ReDIX Task Manager</title>
-    <link rel="manifest" href="/manifest.json">
+    <link rel="manifest" href="./manifest.json">
     <meta name="theme-color" content="#4a90e2">
-    <link rel="apple-touch-icon" href="/icon-192x192.png">
+    <link rel="apple-touch-icon" href="./icon-192x192.png">
     <script src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
@@ -26,6 +26,8 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
+        import { openDB } from 'idb';
+
         const dbPromise = idb.openDB('task-manager-db', 1, {
             upgrade(db) {
                 db.createObjectStore('tasks');
@@ -44,11 +46,6 @@
 
         function TaskManager() {
             const [tasks, setTasks] = useState({});
-            return (
-            <div>
-                <h1>Test Rendering</h1>
-            </div>
-            );
             const [currentWeek, setCurrentWeek] = useState(getCurrentWeek());
             const [newTask, setNewTask] = useState({ feature: '', description: '', priority: 'Niedrig', dueDate: '' });
             const [quote, setQuote] = useState('');
