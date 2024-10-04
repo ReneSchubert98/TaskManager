@@ -1,1 +1,388 @@
-update
+import { openDB } from 'idb';
+
+const dbPromise = openDB('task-manager-db', 1, {
+  upgrade(db) {
+    db.createObjectStore('tasks');
+  },
+});
+
+async function saveTasksToIndexedDB(tasks) {
+  const db = await dbPromise;
+  await db.put('tasks', tasks, 'allTasks');
+}
+
+async function getTasksFromIndexedDB() {
+  const db = await dbPromise;
+  return await db.get('tasks', 'allTasks');
+}
+
+function TaskManager() {
+  // ... Vorheriger Code ...
+
+  useEffect(() => {
+    async function loadTasks() {
+      const storedTasks = await getTasksFromIndexedDB();
+      if (storedTasks) {
+        setTasks(storedTasks);
+      }
+    }
+    loadTasks();
+  }, []);
+
+  useEffect(() => {
+    saveTasksToIndexedDB(tasks);
+  }, [tasks]);
+
+  // ... Restlicher Code ...
+}
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ReDIX Task Manager</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#4a90e2">
+    <link rel="apple-touch-icon" href="/icon-192x192.png">
+    <script src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+    <script src="https://unpkg.com/idb@7.0.1/build/iife/index-min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        @media (max-width: 640px) {
+            .container { padding-left: 1rem; padding-right: 1rem; }
+        }
+        .task-card { transition: all 0.3s ease; }
+        .task-card:active { transform: scale(0.98); }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function TaskManager() {
+            const [tasks, setTasks] = useState({});
+            const [currentWeek, setCurrentWeek] = useState(getCurrentWeek());
+            const [newTask, setNewTask] = useState({ feature: '', description: '', priority: 'Niedrig', dueDate: '' });
+            const [quote, setQuote] = useState('');
+            const [searchTerm, setSearchTerm] = useState('');
+
+            useEffect(() => {
+                const storedTasks = localStorage.getItem('tasks');
+                if (storedTasks) {
+                    setTasks(JSON.parse(storedTasks));
+                }
+                updateQuote();
+            }, []);
+
+            useEffect(() => {
+                localStorage.setItem('tasks', JSON.stringify(tasks));
+            }, [tasks]);
+
+            function getCurrentWeek() {
+                const now = new Date();
+                const onejan = new Date(now.getFullYear(), 0, 1);
+                return Math.ceil((((now - onejan) / 86400000) + onejan.getDay() + 1) / 7);
+            }
+
+            function addTask() {
+                if (newTask.feature && newTask.description) {
+                    setTasks(prevTasks => {
+                        const updatedTasks = Object.assign({}, prevTasks);
+                        if (!updatedTasks[currentWeek]) {
+                            updatedTasks[currentWeek] = [];
+                        }
+                        updatedTasks[currentWeek].push(Object.assign({}, newTask, {
+                            id: Date.now(),
+                            status: 'Offen',
+                            subtasks: []
+                        }));
+                        return updatedTasks;
+                    });
+                    setNewTask({ feature: '', description: '', priority: 'Niedrig', dueDate: '' });
+                }
+            }
+
+            function deleteTask(taskId) {
+                setTasks(prevTasks => {
+                    const updatedTasks = Object.assign({}, prevTasks);
+                    updatedTasks[currentWeek] = updatedTasks[currentWeek].filter(task => task.id !== taskId);
+                    return updatedTasks;
+                });
+            }
+
+            function toggleStatus(taskId) {
+                setTasks(prevTasks => {
+                    const updatedTasks = Object.assign({}, prevTasks);
+                    const taskIndex = updatedTasks[currentWeek].findIndex(task => task.id === taskId);
+                    if (taskIndex !== -1) {
+                        const task = updatedTasks[currentWeek][taskIndex];
+                        task.status = task.status === 'Offen' ? 'Erledigt' : 'Offen';
+                        if (task.status === 'Erledigt') {
+                            task.subtasks.forEach(subtask => subtask.status = 'Erledigt');
+                        }
+                    }
+                    return updatedTasks;
+                });
+            }
+
+            function addSubtask(taskId) {
+                const subtaskDescription = prompt("Beschreibung der Unteraufgabe:");
+                if (subtaskDescription) {
+                    setTasks(prevTasks => {
+                        const updatedTasks = Object.assign({}, prevTasks);
+                        const taskIndex = updatedTasks[currentWeek].findIndex(task => task.id === taskId);
+                        if (taskIndex !== -1) {
+                            updatedTasks[currentWeek][taskIndex].subtasks.push({
+                                id: Date.now(),
+                                description: subtaskDescription,
+                                status: 'Offen'
+                            });
+                        }
+                        return updatedTasks;
+                    });
+                }
+            }
+
+            function toggleSubtaskStatus(taskId, subtaskId) {
+                setTasks(prevTasks => {
+                    const updatedTasks = Object.assign({}, prevTasks);
+                    const taskIndex = updatedTasks[currentWeek].findIndex(task => task.id === taskId);
+                    if (taskIndex !== -1) {
+                        const subtaskIndex = updatedTasks[currentWeek][taskIndex].subtasks.findIndex(subtask => subtask.id === subtaskId);
+                        if (subtaskIndex !== -1) {
+                            const subtask = updatedTasks[currentWeek][taskIndex].subtasks[subtaskIndex];
+                            subtask.status = subtask.status === 'Offen' ? 'Erledigt' : 'Offen';
+                            
+                            // Update main task status based on subtasks
+                            const allSubtasksCompleted = updatedTasks[currentWeek][taskIndex].subtasks.every(st => st.status === 'Erledigt');
+                            updatedTasks[currentWeek][taskIndex].status = allSubtasksCompleted ? 'Erledigt' : 'Offen';
+                        }
+                    }
+                    return updatedTasks;
+                });
+            }
+
+            function updateQuote() {
+                const quotes = [
+                    "Der beste Weg, die Zukunft vorherzusagen, ist, sie zu erschaffen.",
+                    "Erfolg ist nicht final, Misserfolg ist nicht fatal: Es ist der Mut weiterzumachen, der zählt.",
+                    "Die einzige Begrenzung zur Verwirklichung von morgen sind unsere Zweifel von heute.",
+                    "Der Weg zum Erfolg ist die Beharrlichkeit des Handelns.",
+                    "Glaube an dich selbst und alles ist möglich.",
+                    "Jeder Fortschritt beginnt mit der Entscheidung, es zu versuchen.",
+                    "Die Zukunft gehört denen, die an die Schönheit ihrer Träume glauben.",
+                    "Der einzige Weg, großartige Arbeit zu leisten, ist zu lieben, was man tut.",
+                    "Erfolg ist die Summe kleiner Anstrengungen, die täglich wiederholt werden.",
+                    "Wer aufhört, besser werden zu wollen, hört auf, gut zu sein.",
+                    "Das Geheimnis des Fortschritts ist, den ersten Schritt zu tun.",
+                    "Jeder Augenblick ist eine neue Chance, dein Leben zu verändern.",
+                    "Träume nicht dein Leben, lebe deinen Traum.",
+                    "Der Unterschied zwischen dem Unmöglichen und dem Möglichen liegt in der Entschlossenheit eines Menschen.",
+                    "Wer immer tut, was er schon kann, bleibt immer das, was er schon ist.",
+                    "Es ist nicht von Bedeutung, wie langsam du gehst, solange du nicht stehenbleibst.",
+                    "Die größte Ehre, die man einem Menschen antun kann, ist die, dass man zu ihm Vertrauen hat.",
+                    "Wer kämpft, kann verlieren. Wer nicht kämpft, hat schon verloren.",
+                    "Es gibt nur einen Erfolg: Das Leben nach eigenen Vorstellungen leben zu können.",
+                    "Der Mensch hat dreierlei Wege, klug zu handeln: durch Nachdenken ist der edelste, durch Nachahmen der einfachste, durch Erfahrung der bitterste.",
+                    "Nichts auf der Welt ist so mächtig wie eine Idee, deren Zeit gekommen ist.",
+                    "Das Leben ist wie Fahrrad fahren. Um die Balance zu halten, musst du in Bewegung bleiben.",
+                    "Wer aufhört zu lernen, ist alt, mag er zwanzig oder achtzig Jahre zählen.",
+                    "Die Kunst des Fortschritts besteht darin, den Wandel zu bewahren und die Ordnung zu vervollkommnen.",
+                    "Der Pessimist sieht die Schwierigkeit in jeder Gelegenheit. Der Optimist sieht die Gelegenheit in jeder Schwierigkeit.",
+                    "Erfolg ist kein Zufall. Es ist harte Arbeit, Ausdauer, Lernen, Studieren, Opfer und vor allem Liebe zu dem, was du tust oder lernst zu tun.",
+                    "Die Zukunft hängt davon ab, was wir heute tun.",
+                    "Wer einen Fehler macht und ihn nicht korrigiert, begeht einen zweiten.",
+                    "Das Geheimnis des Erfolges ist, den Standpunkt des anderen zu verstehen.",
+                    "Der wahre Weg zum Glück ist: anderen Freude zu bereiten.",
+                    "Wer sich nicht selbst treu bleibt, kann auch anderen gegenüber nicht aufrichtig sein.",
+                    "Die größte Entdeckung aller Zeiten ist, dass ein Mensch seine Zukunft verändern kann, indem er seine Einstellung ändert.",
+                    "Hindernisse sind diese furchterregenden Sachen, die du siehst, wenn du deine Augen von deinem Ziel abwendest.",
+                    "Erfolg ist die Fähigkeit, von einem Misserfolg zum anderen zu gehen, ohne seine Begeisterung zu verlieren.",
+                    "Die besten Dinge im Leben sind nicht die, die man für Geld bekommt.",
+                    "Der Schlüssel zum Erfolg ist, sich auf das zu konzentrieren, was man will, nicht auf das, was man fürchtet.",
+                    "Wer aufhört, Fehler zu machen, lernt nichts mehr dazu.",
+                    "Das Leben ist zu kurz, um kleine Träume zu haben.",
+                    "Die Qualität deiner Gedanken bestimmt die Qualität deines Lebens.",
+                    "Der einzige Ort, an dem Erfolg vor Arbeit kommt, ist im Wörterbuch.",
+                    "Sei du selbst die Veränderung, die du dir wünschst für diese Welt.",
+                    "Es ist besser, unvollkommen zu beginnen, als perfekt zu zögern.",
+                    "Wer nicht an sich selbst glaubt, kann auch andere nicht überzeugen.",
+                    "Die größte Schwäche liegt im Aufgeben. Der sicherste Weg zum Erfolg ist immer, es doch noch einmal zu versuchen.",
+                    "Jeder Mensch ist ein Genie. Aber wenn du einen Fisch danach beurteilst, ob er auf einen Baum klettern kann, wird er sein ganzes Leben glauben, dass er dumm ist.",
+                    "Das Wichtigste im Leben ist nicht, dass wir gewinnen, sondern dass wir nicht aufgeben.",
+                    "Wer aufhört zu träumen, hört auf zu leben.",
+                    "Die Zukunft gehört denen, die an die Wahrhaftigkeit ihrer Träume glauben.",
+                    "Der beste Zeitpunkt, einen Baum zu pflanzen, war vor 20 Jahren. Der zweitbeste Zeitpunkt ist jetzt.",
+                    "Erfolg ist nicht der Schlüssel zum Glück. Glück ist der Schlüssel zum Erfolg. Wenn du liebst, was du tust, wirst du erfolgreich sein.",
+                    "Die größten Menschen sind jene, die anderen Hoffnung geben können."
+                ];
+                setQuote(quotes[currentWeek % quotes.length]);
+            }
+
+            function calculateProgress() {
+                if (!tasks[currentWeek]) return 0;
+                const totalItems = tasks[currentWeek].reduce((acc, task) => acc + 1 + task.subtasks.length, 0);
+                const completedItems = tasks[currentWeek].reduce((acc, task) => {
+                    const completedSubtasks = task.subtasks.filter(st => st.status === 'Erledigt').length;
+                    return acc + (task.status === 'Erledigt' ? 1 : 0) + completedSubtasks;
+                }, 0);
+                return totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
+            }
+
+            function getOpenTasksFromPreviousWeeks() {
+                const openTasks = [];
+                for (let week in tasks) {
+                    if (parseInt(week) < currentWeek) {
+                        tasks[week].forEach(task => {
+                            if (task.status === 'Offen') {
+                                openTasks.push({ ...task, week: parseInt(week) });
+                            }
+                        });
+                    }
+                }
+                return openTasks;
+            }
+
+            const filteredTasks = tasks[currentWeek] ? tasks[currentWeek].filter(task =>
+                task.feature.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                task.description.toLowerCase().includes(searchTerm.toLowerCase())
+            ) : [];
+
+            return (
+                <div className="container mx-auto p-4">
+                    <h1 className="text-3xl font-bold mb-4">ReDIX Task Manager</h1>
+                    
+                    <div className="mb-4 flex justify-between items-center">
+                        <button onClick={() => setCurrentWeek(prev => prev - 1)} className="bg-blue-500 text-white px-4 py-2 rounded">
+                            Vorherige Woche
+                        </button>
+                        <h2 className="text-xl font-semibold">Kalenderwoche {currentWeek}</h2>
+                        <button onClick={() => setCurrentWeek(prev => prev + 1)} className="bg-blue-500 text-white px-4 py-2 rounded">
+                            Nächste Woche
+                        </button>
+                    </div>
+
+                    <div className="mb-4 p-4 bg-white rounded shadow">
+                        <h3 className="text-lg font-semibold mb-2">Neue Aufgabe</h3>
+                        <input
+                            type="text"
+                            placeholder="Feature-Nummer"
+                            value={newTask.feature}
+                            onChange={(e) => setNewTask(Object.assign({}, newTask, {feature: e.target.value}))}
+                            className="w-full p-2 mb-2 border rounded"
+                        />
+                        <textarea
+                            placeholder="Beschreibung"
+                            value={newTask.description}
+                            onChange={(e) => setNewTask(Object.assign({}, newTask, {description: e.target.value}))}
+                            className="w-full p-2 mb-2 border rounded"
+                        />
+                        <select
+                            value={newTask.priority}
+                            onChange={(e) => setNewTask(Object.assign({}, newTask, {priority: e.target.value}))}
+                            className="w-full p-2 mb-2 border rounded"
+                        >
+                            <option value="Niedrig">Niedrig</option>
+                            <option value="Mittel">Mittel</option>
+                            <option value="Hoch">Hoch</option>
+                        </select>
+                        <input
+                            type="date"
+                            value={newTask.dueDate}
+                            onChange={(e) => setNewTask(Object.assign({}, newTask, {dueDate: e.target.value}))}
+                            className="w-full p-2 mb-2 border rounded"
+                        />
+                        <button onClick={addTask} className="w-full bg-green-500 text-white px-4 py-2 rounded">
+                            Aufgabe hinzufügen
+                        </button>
+                    </div>
+
+                    <div className="mb-4 p-4 bg-white rounded shadow">
+                        <h3 className="text-lg font-semibold mb-2">Fortschritt</h3>
+                        <div className="w-full bg-gray-200 rounded">
+                            <div
+                                className="bg-blue-500 text-xs font-medium text-blue-100 text-center p-0.5 leading-none rounded"
+                                style={{ width: `${calculateProgress()}%` }}
+                            >
+                                {calculateProgress().toFixed(1)}%
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mb-4">
+                        <input
+                            type="text"
+                            placeholder="Suche nach Aufgaben..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full p-2 border rounded"
+                        />
+                    </div>
+
+                    <div className="space-y-4">
+                        {filteredTasks.map(task => (
+                            <div key={task.id} className={`p-4 rounded shadow ${task.status === 'Erledigt' ? 'bg-green-100' : 'bg-white'}`}>
+                                <h3 className="text-lg font-semibold">{task.feature}: {task.description}</h3>
+                                <p>Status: {task.status}</p>
+                                <p>Priorität: {task.priority}</p>
+                                <p>Fälligkeitsdatum: {task.dueDate}</p>
+                                <div className="mt-2 space-x-2">
+                                    <button onClick={() => toggleStatus(task.id)} className="bg-blue-500 text-white px-2 py-1 rounded">
+                                        Status umschalten
+                                    </button>
+                                    <button onClick={() => deleteTask(task.id)} className="bg-red-500 text-white px-2 py-1 rounded">
+                                        Löschen
+                                    </button>
+                                    <button onClick={() => addSubtask(task.id)} className="bg-purple-500 text-white px-2 py-1 rounded">
+                                        Unteraufgabe hinzufügen
+                                    </button>
+                                </div>
+                                {task.subtasks.length > 0 && (
+                                    <div className="mt-2">
+                                        <h4 className="font-semibold">Unteraufgaben:</h4>
+                                        <ul className="list-disc list-inside">
+                                            {task.subtasks.map(subtask => (
+                                                <li key={subtask.id} className="flex items-center">
+                                                    <span className={subtask.status === 'Erledigt' ? 'line-through' : ''}>
+                                                        {subtask.description}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => toggleSubtaskStatus(task.id, subtask.id)}
+                                                        className="ml-2 bg-gray-300 text-gray-800 px-2 py-1 rounded text-sm"
+                                                    >
+                                                        {subtask.status === 'Erledigt' ? 'Wiedereröffnen' : 'Erledigt'}
+                                                    </button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="mt-8 p-4 bg-white rounded shadow">
+                        <h3 className="text-lg font-semibold mb-2">Offene Aufgaben aus vorherigen Wochen</h3>
+                        <div className="space-y-2">
+                            {getOpenTasksFromPreviousWeeks().map(task => (
+                                <div key={task.id} className="p-2 bg-yellow-100 rounded">
+                                    <p><strong>Woche {task.week}:</strong> {task.feature} - {task.description}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="mt-4 p-4 bg-gray-100 rounded">
+                        <p className="text-center italic">{quote}</p>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(React.createElement(TaskManager), document.getElementById('root'));
+    </script>
+</body>
+</html>
