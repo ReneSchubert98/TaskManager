@@ -56,3 +56,16 @@ li.done {
     text-decoration: line-through;
     color: gray;
 }
+
+.container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+.task-card {
+    transition: all 0.3s ease;
+}
+
+.task-card:active {
+    transform: scale(0.98);
+}

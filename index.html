@@ -2,19 +2,21 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Task Manager</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ReDIX Task Manager</title>
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#4a90e2">
+    <link rel="apple-touch-icon" href="./icon-192x192.png">
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
-<body>
-    <div class="container">
-        <h1>Taskliste</h1>
-        <form id="taskForm">
-            <input type="text" id="taskInput" placeholder="Neue Aufgabe" required>
-            <button type="submit">Hinzufügen</button>
-        </form>
-        <ul id="taskList"></ul>
-    </div>
-    <script src="index.js"></script>
+<body class="bg-gray-100">
+    <div id="root"></div>
+
+    <script src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+    <script src="https://unpkg.com/idb@7.0.1/build/iife/index-min.js"></script>
+    <script src="dist/index.js"></script>
 </body>
 </html>
