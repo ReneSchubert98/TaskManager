@@ -1,4 +1,40 @@
-<!DOCTYPE html>
+import { openDB } from 'idb';
+
+const dbPromise = openDB('task-manager-db', 1, {
+  upgrade(db) {
+    db.createObjectStore('tasks');
+  },
+});
+
+async function saveTasksToIndexedDB(tasks) {
+  const db = await dbPromise;
+  await db.put('tasks', tasks, 'allTasks');
+}
+
+async function getTasksFromIndexedDB() {
+  const db = await dbPromise;
+  return await db.get('tasks', 'allTasks');
+}
+
+function TaskManager() {
+  // ... Vorheriger Code ...
+
+  useEffect(() => {
+    async function loadTasks() {
+      const storedTasks = await getTasksFromIndexedDB();
+      if (storedTasks) {
+        setTasks(storedTasks);
+      }
+    }
+    loadTasks();
+  }, []);
+
+  useEffect(() => {
+    saveTasksToIndexedDB(tasks);
+  }, [tasks]);
+
+  // ... Restlicher Code ...
+}
 <html lang="de">
 <head>
     <meta charset="UTF-8">
@@ -26,43 +62,23 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        const dbPromise = idb.openDB('task-manager-db', 1, {
-            upgrade(db) {
-                db.createObjectStore('tasks');
-            },
-        });
-
-        async function saveTasksToIndexedDB(tasks) {
-            const db = await dbPromise;
-            await db.put('tasks', tasks, 'allTasks');
-        }
-
-        async function getTasksFromIndexedDB() {
-            const db = await dbPromise;
-            return await db.get('tasks', 'allTasks');
-        }
-
         function TaskManager() {
             const [tasks, setTasks] = useState({});
             const [currentWeek, setCurrentWeek] = useState(getCurrentWeek());
             const [newTask, setNewTask] = useState({ feature: '', description: '', priority: 'Niedrig', dueDate: '' });
             const [quote, setQuote] = useState('');
             const [searchTerm, setSearchTerm] = useState('');
-            const [showNewTaskForm, setShowNewTaskForm] = useState(false);
 
             useEffect(() => {
-                async function loadTasks() {
-                    const storedTasks = await getTasksFromIndexedDB();
-                    if (storedTasks) {
-                        setTasks(storedTasks);
-                    }
+                const storedTasks = localStorage.getItem('tasks');
+                if (storedTasks) {
+                    setTasks(JSON.parse(storedTasks));
                 }
-                loadTasks();
                 updateQuote();
             }, []);
 
             useEffect(() => {
-                saveTasksToIndexedDB(tasks);
+                localStorage.setItem('tasks', JSON.stringify(tasks));
             }, [tasks]);
 
             function getCurrentWeek() {
@@ -74,26 +90,24 @@
             function addTask() {
                 if (newTask.feature && newTask.description) {
                     setTasks(prevTasks => {
-                        const updatedTasks = {...prevTasks};
+                        const updatedTasks = Object.assign({}, prevTasks);
                         if (!updatedTasks[currentWeek]) {
                             updatedTasks[currentWeek] = [];
                         }
-                        updatedTasks[currentWeek].push({
+                        updatedTasks[currentWeek].push(Object.assign({}, newTask, {
                             id: Date.now(),
-                            ...newTask,
                             status: 'Offen',
                             subtasks: []
-                        });
+                        }));
                         return updatedTasks;
                     });
                     setNewTask({ feature: '', description: '', priority: 'Niedrig', dueDate: '' });
-                    setShowNewTaskForm(false);
                 }
             }
 
             function deleteTask(taskId) {
                 setTasks(prevTasks => {
-                    const updatedTasks = {...prevTasks};
+                    const updatedTasks = Object.assign({}, prevTasks);
                     updatedTasks[currentWeek] = updatedTasks[currentWeek].filter(task => task.id !== taskId);
                     return updatedTasks;
                 });
@@ -101,7 +115,7 @@
 
             function toggleStatus(taskId) {
                 setTasks(prevTasks => {
-                    const updatedTasks = {...prevTasks};
+                    const updatedTasks = Object.assign({}, prevTasks);
                     const taskIndex = updatedTasks[currentWeek].findIndex(task => task.id === taskId);
                     if (taskIndex !== -1) {
                         const task = updatedTasks[currentWeek][taskIndex];
@@ -118,7 +132,7 @@
                 const subtaskDescription = prompt("Beschreibung der Unteraufgabe:");
                 if (subtaskDescription) {
                     setTasks(prevTasks => {
-                        const updatedTasks = {...prevTasks};
+                        const updatedTasks = Object.assign({}, prevTasks);
                         const taskIndex = updatedTasks[currentWeek].findIndex(task => task.id === taskId);
                         if (taskIndex !== -1) {
                             updatedTasks[currentWeek][taskIndex].subtasks.push({
@@ -134,7 +148,7 @@
 
             function toggleSubtaskStatus(taskId, subtaskId) {
                 setTasks(prevTasks => {
-                    const updatedTasks = {...prevTasks};
+                    const updatedTasks = Object.assign({}, prevTasks);
                     const taskIndex = updatedTasks[currentWeek].findIndex(task => task.id === taskId);
                     if (taskIndex !== -1) {
                         const subtaskIndex = updatedTasks[currentWeek][taskIndex].subtasks.findIndex(subtask => subtask.id === subtaskId);
@@ -142,6 +156,7 @@
                             const subtask = updatedTasks[currentWeek][taskIndex].subtasks[subtaskIndex];
                             subtask.status = subtask.status === 'Offen' ? 'Erledigt' : 'Offen';
                             
+                            // Update main task status based on subtasks
                             const allSubtasksCompleted = updatedTasks[currentWeek][taskIndex].subtasks.every(st => st.status === 'Erledigt');
                             updatedTasks[currentWeek][taskIndex].status = allSubtasksCompleted ? 'Erledigt' : 'Offen';
                         }
@@ -238,15 +253,50 @@
 
             return (
                 <div className="container mx-auto p-4">
-                    <h1 className="text-2xl font-bold mb-4">ReDIX Task Manager</h1>
+                    <h1 className="text-3xl font-bold mb-4">ReDIX Task Manager</h1>
                     
                     <div className="mb-4 flex justify-between items-center">
-                        <button onClick={() => setCurrentWeek(prev => prev - 1)} className="bg-blue-500 text-white px-3 py-1 rounded text-sm">
-                            ← Vorherige
+                        <button onClick={() => setCurrentWeek(prev => prev - 1)} className="bg-blue-500 text-white px-4 py-2 rounded">
+                            Vorherige Woche
                         </button>
-                        <h2 className="text-lg font-semibold">KW {currentWeek}</h2>
-                        <button onClick={() => setCurrentWeek(prev => prev + 1)} className="bg-blue-500 text-white px-3 py-1 rounded text-sm">
-                            Nächste →
+                        <h2 className="text-xl font-semibold">Kalenderwoche {currentWeek}</h2>
+                        <button onClick={() => setCurrentWeek(prev => prev + 1)} className="bg-blue-500 text-white px-4 py-2 rounded">
+                            Nächste Woche
+                        </button>
+                    </div>
+
+                    <div className="mb-4 p-4 bg-white rounded shadow">
+                        <h3 className="text-lg font-semibold mb-2">Neue Aufgabe</h3>
+                        <input
+                            type="text"
+                            placeholder="Feature-Nummer"
+                            value={newTask.feature}
+                            onChange={(e) => setNewTask(Object.assign({}, newTask, {feature: e.target.value}))}
+                            className="w-full p-2 mb-2 border rounded"
+                        />
+                        <textarea
+                            placeholder="Beschreibung"
+                            value={newTask.description}
+                            onChange={(e) => setNewTask(Object.assign({}, newTask, {description: e.target.value}))}
+                            className="w-full p-2 mb-2 border rounded"
+                        />
+                        <select
+                            value={newTask.priority}
+                            onChange={(e) => setNewTask(Object.assign({}, newTask, {priority: e.target.value}))}
+                            className="w-full p-2 mb-2 border rounded"
+                        >
+                            <option value="Niedrig">Niedrig</option>
+                            <option value="Mittel">Mittel</option>
+                            <option value="Hoch">Hoch</option>
+                        </select>
+                        <input
+                            type="date"
+                            value={newTask.dueDate}
+                            onChange={(e) => setNewTask(Object.assign({}, newTask, {dueDate: e.target.value}))}
+                            className="w-full p-2 mb-2 border rounded"
+                        />
+                        <button onClick={addTask} className="w-full bg-green-500 text-white px-4 py-2 rounded">
+                            Aufgabe hinzufügen
                         </button>
                     </div>
 
@@ -272,65 +322,21 @@
                         />
                     </div>
 
-                    <button 
-                        onClick={() => setShowNewTaskForm(!showNewTaskForm)} 
-                        className="w-full bg-green-500 text-white px-4 py-2 rounded mb-4"
-                    >
-                        {showNewTaskForm ? 'Formular schließen' : 'Neue Aufgabe hinzufügen'}
-                    </button>
-
-                    {showNewTaskForm && (
-                        <div className="mb-4 p-4 bg-white rounded shadow">
-                            <h3 className="text-lg font-semibold mb-2">Neue Aufgabe</h3>
-                            <input
-                                type="text"
-                                placeholder="Feature-Nummer"
-                                value={newTask.feature}
-                                onChange={(e) => setNewTask({...newTask, feature: e.target.value})}
-                                className="w-full p-2 mb-2 border rounded"
-                            />
-                            <textarea
-                                placeholder="Beschreibung"
-                                value={newTask.description}
-                                onChange={(e) => setNewTask({...newTask, description: e.target.value})}
-                                className="w-full p-2 mb-2 border rounded"
-                            />
-                            <select
-                                value={newTask.priority}
-                                onChange={(e) => setNewTask({...newTask, priority: e.target.value})}
-                                className="w-full p-2 mb-2 border rounded"
-                            >
-                                <option value="Niedrig">Niedrig</option>
-                                <option value="Mittel">Mittel</option>
-                                <option value="Hoch">Hoch</option>
-                            </select>
-                            <input
-                                type="date"
-                                value={newTask.dueDate}
-                                onChange={(e) => setNewTask({...newTask, dueDate: e.target.value})}
-                                className="w-full p-2 mb-2 border rounded"
-                            />
-                            <button onClick={addTask} className="w-full bg-blue-500 text-white px-4 py-2 rounded">
-                                Aufgabe hinzufügen
-                            </button>
-                        </div>
-                    )}
-
                     <div className="space-y-4">
                         {filteredTasks.map(task => (
-                            <div key={task.id} className={`p-4 rounded shadow task-card ${task.status === 'Erledigt' ? 'bg-green-100' : 'bg-white'}`}>
+                            <div key={task.id} className={`p-4 rounded shadow ${task.status === 'Erledigt' ? 'bg-green-100' : 'bg-white'}`}>
                                 <h3 className="text-lg font-semibold">{task.feature}: {task.description}</h3>
                                 <p>Status: {task.status}</p>
                                 <p>Priorität: {task.priority}</p>
                                 <p>Fälligkeitsdatum: {task.dueDate}</p>
-                                <div className="mt-2 space-y-2">
-                                    <button onClick={() => toggleStatus(task.id)} className="w-full bg-blue-500 text-white px-2 py-1 rounded text-sm">
+                                <div className="mt-2 space-x-2">
+                                    <button onClick={() => toggleStatus(task.id)} className="bg-blue-500 text-white px-2 py-1 rounded">
                                         Status umschalten
                                     </button>
-                                    <button onClick={() => deleteTask(task.id)} className="w-full bg-red-500 text-white px-2 py-1 rounded text-sm">
+                                    <button onClick={() => deleteTask(task.id)} className="bg-red-500 text-white px-2 py-1 rounded">
                                         Löschen
                                     </button>
-                                    <button onClick={() => addSubtask(task.id)} className="w-full bg-purple-500 text-white px-2 py-1 rounded text-sm">
+                                    <button onClick={() => addSubtask(task.id)} className="bg-purple-500 text-white px-2 py-1 rounded">
                                         Unteraufgabe hinzufügen
                                     </button>
                                 </div>
@@ -339,7 +345,7 @@
                                         <h4 className="font-semibold">Unteraufgaben:</h4>
                                         <ul className="list-disc list-inside">
                                             {task.subtasks.map(subtask => (
-                                                <li key={subtask.id} className="flex items-center justify-between">
+                                                <li key={subtask.id} className="flex items-center">
                                                     <span className={subtask.status === 'Erledigt' ? 'line-through' : ''}>
                                                         {subtask.description}
                                                     </span>
@@ -370,25 +376,13 @@
                     </div>
 
                     <div className="mt-4 p-4 bg-gray-100 rounded">
-                        <p className="text-center italic text-sm">{quote}</p>
+                        <p className="text-center italic">{quote}</p>
                     </div>
                 </div>
             );
         }
 
-        ReactDOM.render(<TaskManager />, document.getElementById('root'));
-
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/service-worker.js')
-                    .then((registration) => {
-                        console.log('Service Worker registered:', registration);
-                    })
-                    .catch((error) => {
-                        console.log('Service Worker registration failed:', error);
-                    });
-            });
-        }
+        ReactDOM.render(React.createElement(TaskManager), document.getElementById('root'));
     </script>
 </body>
 </html>
