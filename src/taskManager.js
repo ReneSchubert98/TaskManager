@@ -31,52 +31,13 @@ const getOpenTasksFromPreviousWeeks = (tasks, currentWeek) => {
     return openTasks;
 };
 
-// Custom hooks
-const useLocalStorage = (key, initialValue) => {
-    const [storedValue, setStoredValue] = useState(() => {
-        try {
-            const item = window.localStorage.getItem(key);
-            return item ? JSON.parse(item) : initialValue;
-        } catch (error) {
-            console.log(error);
-            return initialValue;
-        }
-    });
-
-    const setValue = value => {
-        try {
-            const valueToStore = value instanceof Function ? value(storedValue) : value;
-            setStoredValue(valueToStore);
-            window.localStorage.setItem(key, JSON.stringify(valueToStore));
-        } catch (error) {
-            console.log(error);
-        }
-    };
-
-    return [storedValue, setValue];
-};
-
-const useNotification = () => {
-    const [showNotification, setShowNotification] = useState(false);
-    const [notificationMessage, setNotificationMessage] = useState('');
-
-    const notify = useCallback((message) => {
-        setNotificationMessage(message);
-        setShowNotification(true);
-        setTimeout(() => setShowNotification(false), 3000);
-    }, []);
-
-    return { showNotification, notificationMessage, notify };
-};
-
 // Main component
 function TaskManager() {
-    const [tasks, setTasks] = useLocalStorage('tasks', {});
+    const [tasks, setTasks] = useState({});
     const [currentWeek, setCurrentWeek] = useState(getCurrentWeek());
     const [newTask, setNewTask] = useState({ feature: '', description: '', priority: 'Niedrig', dueDate: '' });
     const [quote, setQuote] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
-    const { showNotification, notificationMessage, notify } = useNotification();
 
     useEffect(() => {
         updateQuote();
@@ -98,9 +59,8 @@ function TaskManager() {
                 return updatedTasks;
             });
             setNewTask({ feature: '', description: '', priority: 'Niedrig', dueDate: '' });
-            notify('Aufgabe erfolgreich hinzugefügt');
         }
-    }, [newTask, currentWeek, notify]);
+    }, [newTask, currentWeek]);
 
     const deleteTask = useCallback((taskId) => {
         setTasks(prevTasks => {
@@ -108,8 +68,7 @@ function TaskManager() {
             updatedTasks[currentWeek] = updatedTasks[currentWeek].filter(task => task.id !== taskId);
             return updatedTasks;
         });
-        notify('Aufgabe gelöscht');
-    }, [currentWeek, notify]);
+    }, [currentWeek]);
 
     const toggleStatus = useCallback((taskId) => {
         setTasks(prevTasks => {
@@ -141,9 +100,8 @@ function TaskManager() {
                 }
                 return updatedTasks;
             });
-            notify('Unteraufgabe hinzugefügt');
         }
-    }, [currentWeek, notify]);
+    }, [currentWeek]);
 
     const toggleSubtaskStatus = useCallback((taskId, subtaskId) => {
         setTasks(prevTasks => {
@@ -169,12 +127,7 @@ function TaskManager() {
             "Erfolg ist nicht final, Misserfolg ist nicht fatal: Es ist der Mut weiterzumachen, der zählt.",
             "Die einzige Begrenzung zur Verwirklichung von morgen sind unsere Zweifel von heute.",
             "Der Weg zum Erfolg ist die Beharrlichkeit des Handelns.",
-            "Glaube an dich selbst und alles ist möglich.",
-            "Jeder Fortschritt beginnt mit der Entscheidung, es zu versuchen.",
-            "Die Zukunft gehört denen, die an die Schönheit ihrer Träume glauben.",
-            "Der einzige Weg, großartige Arbeit zu leisten, ist zu lieben, was man tut.",
-            "Erfolg ist die Summe kleiner Anstrengungen, die täglich wiederholt werden.",
-            "Wer aufhört, besser werden zu wollen, hört auf, gut zu sein."
+            "Glaube an dich selbst und alles ist möglich."
         ];
         setQuote(quotes[currentWeek % quotes.length]);
     }, [currentWeek]);
@@ -187,136 +140,14 @@ function TaskManager() {
     return (
         <div className="container mx-auto p-4">
             <h1 className="text-3xl font-bold mb-4">ReDIX Task Manager</h1>
-            
             <div className="mb-4 flex justify-between items-center">
                 <button onClick={() => setCurrentWeek(prev => prev - 1)} className="bg-blue-500 text-white px-4 py-2 rounded">
                     Vorherige Woche
                 </button>
-                <h2 className="text-xl font-semibold">Kalenderwoche {currentWeek}</h2>
                 <button onClick={() => setCurrentWeek(prev => prev + 1)} className="bg-blue-500 text-white px-4 py-2 rounded">
                     Nächste Woche
                 </button>
             </div>
-
-            <div className="mb-4 p-4 bg-white rounded shadow">
-                <h3 className="text-lg font-semibold mb-2">Neue Aufgabe</h3>
-                <input
-                    type="text"
-                    placeholder="Feature-Nummer"
-                    value={newTask.feature}
-                    onChange={(e) => setNewTask({...newTask, feature: e.target.value})}
-                    className="w-full p-2 mb-2 border rounded"
-                />
-                <textarea
-                    placeholder="Beschreibung"
-                    value={newTask.description}
-                    onChange={(e) => setNewTask({...newTask, description: e.target.value})}
-                    className="w-full p-2 mb-2 border rounded"
-                />
-                <select
-                    value={newTask.priority}
-                    onChange={(e) => setNewTask({...newTask, priority: e.target.value})}
-                    className="w-full p-2 mb-2 border rounded"
-                >
-                    <option value="Niedrig">Niedrig</option>
-                    <option value="Mittel">Mittel</option>
-                    <option value="Hoch">Hoch</option>
-                </select>
-                <input
-                    type="date"
-                    value={newTask.dueDate}
-                    onChange={(e) => setNewTask({...newTask, dueDate: e.target.value})}
-                    className="w-full p-2 mb-2 border rounded"
-                />
-                <button onClick={addTask} className="w-full bg-green-500 text-white px-4 py-2 rounded">
-                    Aufgabe hinzufügen
-                </button>
-            </div>
-
-            <div className="mb-4 p-4 bg-white rounded shadow">
-                <h3 className="text-lg font-semibold mb-2">Fortschritt</h3>
-                <div className="w-full bg-gray-200 rounded">
-                    <div
-                        className="bg-blue-500 text-xs font-medium text-blue-100 text-center p-0.5 leading-none rounded"
-                        style={{ width: `${calculateProgress(tasks, currentWeek)}%` }}
-                    >
-                        {calculateProgress(tasks, currentWeek).toFixed(1)}%
-                    </div>
-                </div>
-            </div>
-
-            <div className="mb-4">
-                <input
-                    type="text"
-                    placeholder="Suche nach Aufgaben..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full p-2 border rounded"
-                />
-            </div>
-
-            <div className="space-y-4">
-                {filteredTasks.map(task => (
-                    <div key={task.id} className={`p-4 rounded shadow ${task.status === 'Erledigt' ? 'bg-green-100' : 'bg-white'}`}>
-                        <h3 className="text-lg font-semibold">{task.feature}: {task.description}</h3>
-                        <p>Status: {task.status}</p>
-                        <p>Priorität: {task.priority}</p>
-                        <p>Fälligkeitsdatum: {task.dueDate}</p>
-                        <div className="mt-2 space-x-2">
-                            <button onClick={() => toggleStatus(task.id)} className="bg-blue-500 text-white px-2 py-1 rounded">
-                                Status umschalten
-                            </button>
-                            <button onClick={() => deleteTask(task.id)} className="bg-red-500 text-white px-2 py-1 rounded">
-                                Löschen
-                            </button>
-                            <button onClick={() => addSubtask(task.id)} className="bg-purple-500 text-white px-2 py-1 rounded">
-                                Unteraufgabe hinzufügen
-                            </button>
-                        </div>
-                        {task.subtasks.length > 0 && (
-                            <div className="mt-2">
-                                <h4 className="font-semibold">Unteraufgaben:</h4>
-                                <ul className="list-disc list-inside">
-                                    {task.subtasks.map(subtask => (
-                                        <li key={subtask.id} className="flex items-center">
-                                            <span className={subtask.status === 'Erledigt' ? 'line-through' : ''}>
-                                                {subtask.description}
-                                            </span>
-                                            <button
-                                                onClick={() => toggleSubtaskStatus(task.id, subtask.id)}
-                                                className="ml-2 bg-gray-300 text-gray-800 px-2 py-1 rounded text-sm"
-                                            >
-                                                {subtask.status === 'Erledigt' ? 'Wiedereröffnen' : 'Erledigt'}
-                                            </button>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
-                    </div>
-                ))}
-            </div>
-
-            <div className="mt-8 p-4 bg-white rounded shadow">
-                <h3 className="text-lg font-semibold mb-2">Offene Aufgaben aus vorherigen Wochen</h3>
-                <div className="space-y-2">
-                    {getOpenTasksFromPreviousWeeks(tasks, currentWeek).map(task => (
-                        <div key={task.id} className="p-2 bg-yellow-100 rounded">
-                            <p><strong>Woche {task.week}:</strong> {task.feature} - {task.description}</p>
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            <div className="mt-4 p-4 bg-gray-100 rounded">
-                <p className="text-center italic">{quote}</p>
-            </div>
-
-            {showNotification && (
-                <div className="fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg">
-                    {notificationMessage}
-                </div>
-            )}
         </div>
     );
 }
