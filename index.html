@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="de">
 <head>
     <meta charset="UTF-8">
@@ -6,7 +7,6 @@
     <script src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
-    <script src="https://unpkg.com/idb@7.0.1/build/iife/index-min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <style>
         @media (max-width: 640px) {
@@ -141,48 +141,7 @@
                     "Die Zukunft gehört denen, die an die Schönheit ihrer Träume glauben.",
                     "Der einzige Weg, großartige Arbeit zu leisten, ist zu lieben, was man tut.",
                     "Erfolg ist die Summe kleiner Anstrengungen, die täglich wiederholt werden.",
-                    "Wer aufhört, besser werden zu wollen, hört auf, gut zu sein.",
-                    "Das Geheimnis des Fortschritts ist, den ersten Schritt zu tun.",
-                    "Jeder Augenblick ist eine neue Chance, dein Leben zu verändern.",
-                    "Träume nicht dein Leben, lebe deinen Traum.",
-                    "Der Unterschied zwischen dem Unmöglichen und dem Möglichen liegt in der Entschlossenheit eines Menschen.",
-                    "Wer immer tut, was er schon kann, bleibt immer das, was er schon ist.",
-                    "Es ist nicht von Bedeutung, wie langsam du gehst, solange du nicht stehenbleibst.",
-                    "Die größte Ehre, die man einem Menschen antun kann, ist die, dass man zu ihm Vertrauen hat.",
-                    "Wer kämpft, kann verlieren. Wer nicht kämpft, hat schon verloren.",
-                    "Es gibt nur einen Erfolg: Das Leben nach eigenen Vorstellungen leben zu können.",
-                    "Der Mensch hat dreierlei Wege, klug zu handeln: durch Nachdenken ist der edelste, durch Nachahmen der einfachste, durch Erfahrung der bitterste.",
-                    "Nichts auf der Welt ist so mächtig wie eine Idee, deren Zeit gekommen ist.",
-                    "Das Leben ist wie Fahrrad fahren. Um die Balance zu halten, musst du in Bewegung bleiben.",
-                    "Wer aufhört zu lernen, ist alt, mag er zwanzig oder achtzig Jahre zählen.",
-                    "Die Kunst des Fortschritts besteht darin, den Wandel zu bewahren und die Ordnung zu vervollkommnen.",
-                    "Der Pessimist sieht die Schwierigkeit in jeder Gelegenheit. Der Optimist sieht die Gelegenheit in jeder Schwierigkeit.",
-                    "Erfolg ist kein Zufall. Es ist harte Arbeit, Ausdauer, Lernen, Studieren, Opfer und vor allem Liebe zu dem, was du tust oder lernst zu tun.",
-                    "Die Zukunft hängt davon ab, was wir heute tun.",
-                    "Wer einen Fehler macht und ihn nicht korrigiert, begeht einen zweiten.",
-                    "Das Geheimnis des Erfolges ist, den Standpunkt des anderen zu verstehen.",
-                    "Der wahre Weg zum Glück ist: anderen Freude zu bereiten.",
-                    "Wer sich nicht selbst treu bleibt, kann auch anderen gegenüber nicht aufrichtig sein.",
-                    "Die größte Entdeckung aller Zeiten ist, dass ein Mensch seine Zukunft verändern kann, indem er seine Einstellung ändert.",
-                    "Hindernisse sind diese furchterregenden Sachen, die du siehst, wenn du deine Augen von deinem Ziel abwendest.",
-                    "Erfolg ist die Fähigkeit, von einem Misserfolg zum anderen zu gehen, ohne seine Begeisterung zu verlieren.",
-                    "Die besten Dinge im Leben sind nicht die, die man für Geld bekommt.",
-                    "Der Schlüssel zum Erfolg ist, sich auf das zu konzentrieren, was man will, nicht auf das, was man fürchtet.",
-                    "Wer aufhört, Fehler zu machen, lernt nichts mehr dazu.",
-                    "Das Leben ist zu kurz, um kleine Träume zu haben.",
-                    "Die Qualität deiner Gedanken bestimmt die Qualität deines Lebens.",
-                    "Der einzige Ort, an dem Erfolg vor Arbeit kommt, ist im Wörterbuch.",
-                    "Sei du selbst die Veränderung, die du dir wünschst für diese Welt.",
-                    "Es ist besser, unvollkommen zu beginnen, als perfekt zu zögern.",
-                    "Wer nicht an sich selbst glaubt, kann auch andere nicht überzeugen.",
-                    "Die größte Schwäche liegt im Aufgeben. Der sicherste Weg zum Erfolg ist immer, es doch noch einmal zu versuchen.",
-                    "Jeder Mensch ist ein Genie. Aber wenn du einen Fisch danach beurteilst, ob er auf einen Baum klettern kann, wird er sein ganzes Leben glauben, dass er dumm ist.",
-                    "Das Wichtigste im Leben ist nicht, dass wir gewinnen, sondern dass wir nicht aufgeben.",
-                    "Wer aufhört zu träumen, hört auf zu leben.",
-                    "Die Zukunft gehört denen, die an die Wahrhaftigkeit ihrer Träume glauben.",
-                    "Der beste Zeitpunkt, einen Baum zu pflanzen, war vor 20 Jahren. Der zweitbeste Zeitpunkt ist jetzt.",
-                    "Erfolg ist nicht der Schlüssel zum Glück. Glück ist der Schlüssel zum Erfolg. Wenn du liebst, was du tust, wirst du erfolgreich sein.",
-                    "Die größten Menschen sind jene, die anderen Hoffnung geben können."
+                    "Wer aufhört, besser werden zu wollen, hört auf, gut zu sein."
                 ];
                 setQuote(quotes[currentWeek % quotes.length]);
             }
@@ -304,7 +263,7 @@
                                     <button onClick={() => toggleStatus(task.id)} className="bg-blue-500 text-white px-2 py-1 rounded">
                                         Status umschalten
                                     </button>
-                                    <button onClick={() () => deleteTask(task.id)} className="bg-red-500 text-white px-2 py-1 rounded">
+                                    <button onClick={() => deleteTask(task.id)} className="bg-red-500 text-white px-2 py-1 rounded">
                                         Löschen
                                     </button>
                                     <button onClick={() => addSubtask(task.id)} className="bg-purple-500 text-white px-2 py-1 rounded">
@@ -359,7 +318,7 @@
             );
         }
 
-        ReactDOM.render(React.createElement(TaskManager), document.getElementById('root'));
+        ReactDOM.render(<TaskManager />, document.getElementById('root'));
     </script>
 </body>
 </html>
