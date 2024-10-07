@@ -21,7 +21,7 @@ var _React = React,
   useCallback = _React.useCallback;
 
 // API-URL
-var API_URL = "http://localhost:5001/";
+var API_URL = "http://localhost:5001/tasks";
 
 // Utility functions
 var getCurrentWeek = function getCurrentWeek() {
@@ -244,7 +244,7 @@ function TaskManager() {
         while (1) switch (_context3.prev = _context3.next) {
           case 0:
             _context3.next = 2;
-            return fetch("".concat(API_URL, "/tasks/").concat(taskId), {
+            return fetch("".concat(API_URL).concat(taskId), {
               method: 'DELETE'
             });
           case 2:
@@ -287,7 +287,7 @@ function TaskManager() {
         while (1) switch (_context4.prev = _context4.next) {
           case 0:
             _context4.next = 2;
-            return fetch("".concat(API_URL, "/tasks/").concat(taskId, "/toggle"), {
+            return fetch("".concat(API_URL).concat(taskId, "/toggle"), {
               method: 'PATCH'
             });
           case 2:
@@ -341,7 +341,7 @@ function TaskManager() {
               break;
             }
             _context5.next = 4;
-            return fetch("".concat(API_URL, "/tasks/").concat(taskId, "/subtasks"), {
+            return fetch("".concat(API_URL).concat(taskId, "/subtasks"), {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json'
@@ -404,7 +404,7 @@ function TaskManager() {
             return _context6.abrupt("return");
           case 3:
             _context6.next = 5;
-            return fetch("".concat(API_URL, "/tasks/").concat(taskId, "/subtasks/").concat(subtaskId, "/toggle"), {
+            return fetch("".concat(API_URL).concat(taskId, "/subtasks/").concat(subtaskId, "/toggle"), {
               method: 'PATCH'
             });
           case 5:
