@@ -17,13 +17,31 @@
         }
         .task-card { transition: all 0.3s ease; }
         .task-card:active { transform: scale(0.98); }
+        .animate-fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
     </style>
 </head>
 <body class="bg-gray-100">
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useRef } = React;
 
         function TaskManager() {
             const [tasks, setTasks] = useState({});
@@ -31,6 +49,12 @@
             const [newTask, setNewTask] = useState({ feature: '', description: '', priority: 'Niedrig', dueDate: '' });
             const [quote, setQuote] = useState('');
             const [searchTerm, setSearchTerm] = useState('');
+            const [showCompletedTasks, setShowCompletedTasks] = useState(true);
+            const [darkMode, setDarkMode] = useState(false);
+            const [showNotification, setShowNotification] = useState(false);
+            const [notificationMessage, setNotificationMessage] = useState('');
+
+            const taskListRef = useRef(null);
 
             useEffect(() => {
                 const storedTasks = localStorage.getItem('tasks');
@@ -38,11 +62,24 @@
                     setTasks(JSON.parse(storedTasks));
                 }
                 updateQuote();
+                const storedDarkMode = localStorage.getItem('darkMode');
+                if (storedDarkMode) {
+                    setDarkMode(JSON.parse(storedDarkMode));
+                }
             }, []);
 
             useEffect(() => {
                 localStorage.setItem('tasks', JSON.stringify(tasks));
             }, [tasks]);
+
+            useEffect(() => {
+                localStorage.setItem('darkMode', JSON.stringify(darkMode));
+                if (darkMode) {
+                    document.body.classList.add('dark');
+                } else {
+                    document.body.classList.remove('dark');
+                }
+            }, [darkMode]);
 
             function getCurrentWeek() {
                 const now = new Date();
@@ -53,32 +90,35 @@
             function addTask() {
                 if (newTask.feature && newTask.description) {
                     setTasks(prevTasks => {
-                        const updatedTasks = Object.assign({}, prevTasks);
+                        const updatedTasks = { ...prevTasks };
                         if (!updatedTasks[currentWeek]) {
                             updatedTasks[currentWeek] = [];
                         }
-                        updatedTasks[currentWeek].push(Object.assign({}, newTask, {
+                        updatedTasks[currentWeek].push({
+                            ...newTask,
                             id: Date.now(),
                             status: 'Offen',
                             subtasks: []
-                        }));
+                        });
                         return updatedTasks;
                     });
                     setNewTask({ feature: '', description: '', priority: 'Niedrig', dueDate: '' });
+                    showNotification('Aufgabe erfolgreich hinzugefügt');
                 }
             }
 
             function deleteTask(taskId) {
                 setTasks(prevTasks => {
-                    const updatedTasks = Object.assign({}, prevTasks);
+                    const updatedTasks = { ...prevTasks };
                     updatedTasks[currentWeek] = updatedTasks[currentWeek].filter(task => task.id !== taskId);
                     return updatedTasks;
                 });
+                showNotification('Aufgabe gelöscht');
             }
 
             function toggleStatus(taskId) {
                 setTasks(prevTasks => {
-                    const updatedTasks = Object.assign({}, prevTasks);
+                    const updatedTasks = { ...prevTasks };
                     const taskIndex = updatedTasks[currentWeek].findIndex(task => task.id === taskId);
                     if (taskIndex !== -1) {
                         const task = updatedTasks[currentWeek][taskIndex];
@@ -95,7 +135,7 @@
                 const subtaskDescription = prompt("Beschreibung der Unteraufgabe:");
                 if (subtaskDescription) {
                     setTasks(prevTasks => {
-                        const updatedTasks = Object.assign({}, prevTasks);
+                        const updatedTasks = { ...prevTasks };
                         const taskIndex = updatedTasks[currentWeek].findIndex(task => task.id === taskId);
                         if (taskIndex !== -1) {
                             updatedTasks[currentWeek][taskIndex].subtasks.push({
@@ -106,12 +146,13 @@
                         }
                         return updatedTasks;
                     });
+                    showNotification('Unteraufgabe hinzugefügt');
                 }
             }
 
             function toggleSubtaskStatus(taskId, subtaskId) {
                 setTasks(prevTasks => {
-                    const updatedTasks = Object.assign({}, prevTasks);
+                    const updatedTasks = { ...prevTasks };
                     const taskIndex = updatedTasks[currentWeek].findIndex(task => task.id === taskId);
                     if (taskIndex !== -1) {
                         const subtaskIndex = updatedTasks[currentWeek][taskIndex].subtasks.findIndex(subtask => subtask.id === subtaskId);
@@ -119,7 +160,6 @@
                             const subtask = updatedTasks[currentWeek][taskIndex].subtasks[subtaskIndex];
                             subtask.status = subtask.status === 'Offen' ? 'Erledigt' : 'Offen';
                             
-                            // Update main task status based on subtasks
                             const allSubtasksCompleted = updatedTasks[currentWeek][taskIndex].subtasks.every(st => st.status === 'Erledigt');
                             updatedTasks[currentWeek][taskIndex].status = allSubtasksCompleted ? 'Erledigt' : 'Offen';
                         }
@@ -210,43 +250,81 @@
             }
 
             const filteredTasks = tasks[currentWeek] ? tasks[currentWeek].filter(task =>
-                task.feature.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                task.description.toLowerCase().includes(searchTerm.toLowerCase())
+                (task.feature.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                task.description.toLowerCase().includes(searchTerm.toLowerCase())) &&
+                (showCompletedTasks || task.status !== 'Erledigt')
             ) : [];
 
+            function showNotification(message) {
+                setNotificationMessage(message);
+                setShowNotification(true);
+                setTimeout(() => setShowNotification(false), 3000);
+            }
+
+            function exportTasks() {
+                const tasksString = JSON.stringify(tasks, null, 2);
+                const blob = new Blob([tasksString], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'redix_tasks.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showNotification('Aufgaben exportiert');
+            }
+
+            function importTasks(event) {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        try {
+                            const importedTasks = JSON.parse(e.target.result);
+                            setTasks(importedTasks);
+                            showNotification('Aufgaben importiert');
+                        } catch (error) {
+                            showNotification('Fehler beim Importieren der Aufgaben');
+                        }
+                    };
+                    reader.readAsText(file);
+                }
+            }
+
             return (
-                <div className="container mx-auto p-4">
+                <div className={`container mx-auto p-4 ${darkMode ? 'dark bg-gray-800 text-white' : ''}`}>
                     <h1 className="text-3xl font-bold mb-4">ReDIX Task Manager</h1>
                     
                     <div className="mb-4 flex justify-between items-center">
-                        <button onClick={() => setCurrentWeek(prev => prev - 1)} className="bg-blue-500 text-white px-4 py-2 rounded">
+                        <button onClick={() => setCurrentWeek(prev => prev - 1)} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition duration-300">
                             Vorherige Woche
                         </button>
                         <h2 className="text-xl font-semibold">Kalenderwoche {currentWeek}</h2>
-                        <button onClick={() => setCurrentWeek(prev => prev + 1)} className="bg-blue-500 text-white px-4 py-2 rounded">
+                        <button onClick={() => setCurrentWeek(prev => prev + 1)} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition duration-300">
                             Nächste Woche
                         </button>
                     </div>
 
-                    <div className="mb-4 p-4 bg-white rounded shadow">
+                    <div className="mb-4 p-4 bg-white rounded shadow dark:bg-gray-700">
                         <h3 className="text-lg font-semibold mb-2">Neue Aufgabe</h3>
                         <input
                             type="text"
                             placeholder="Feature-Nummer"
                             value={newTask.feature}
-                            onChange={(e) => setNewTask(Object.assign({}, newTask, {feature: e.target.value}))}
-                            className="w-full p-2 mb-2 border rounded"
+                            onChange={(e) => setNewTask({...newTask, feature: e.target.value})}
+                            className="w-full p-2 mb-2 border rounded dark:bg-gray-600 dark:text-white"
                         />
                         <textarea
                             placeholder="Beschreibung"
                             value={newTask.description}
-                            onChange={(e) => setNewTask(Object.assign({}, newTask, {description: e.target.value}))}
-                            className="w-full p-2 mb-2 border rounded"
+                            onChange={(e) => setNewTask({...newTask, description: e.target.value})}
+                            className="w-full p-2 mb-2 border rounded dark:bg-gray-600 dark:text-white"
                         />
                         <select
                             value={newTask.priority}
-                            onChange={(e) => setNewTask(Object.assign({}, newTask, {priority: e.target.value}))}
-                            className="w-full p-2 mb-2 border rounded"
+                            onChange={(e) => setNewTask({...newTask, priority: e.target.value})}
+                            className="w-full p-2 mb-2 border rounded dark:bg-gray-600 dark:text-white"
                         >
                             <option value="Niedrig">Niedrig</option>
                             <option value="Mittel">Mittel</option>
@@ -255,17 +333,17 @@
                         <input
                             type="date"
                             value={newTask.dueDate}
-                            onChange={(e) => setNewTask(Object.assign({}, newTask, {dueDate: e.target.value}))}
-                            className="w-full p-2 mb-2 border rounded"
+                            onChange={(e) => setNewTask({...newTask, dueDate: e.target.value})}
+                            className="w-full p-2 mb-2 border rounded dark:bg-gray-600 dark:text-white"
                         />
-                        <button onClick={addTask} className="w-full bg-green-500 text-white px-4 py-2 rounded">
+                        <button onClick={addTask} className="w-full bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition duration-300">
                             Aufgabe hinzufügen
                         </button>
                     </div>
 
-                    <div className="mb-4 p-4 bg-white rounded shadow">
+                    <div className="mb-4 p-4 bg-white rounded shadow dark:bg-gray-700">
                         <h3 className="text-lg font-semibold mb-2">Fortschritt</h3>
-                        <div className="w-full bg-gray-200 rounded">
+                        <div className="w-full bg-gray-200 rounded dark:bg-gray-600">
                             <div
                                 className="bg-blue-500 text-xs font-medium text-blue-100 text-center p-0.5 leading-none rounded"
                                 style={{ width: `${calculateProgress()}%` }}
@@ -275,31 +353,50 @@
                         </div>
                     </div>
 
-                    <div className="mb-4">
+                    <div className="mb-4 flex flex-wrap items-center gap-2">
                         <input
                             type="text"
                             placeholder="Suche nach Aufgaben..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full p-2 border rounded"
+                            className="flex-grow p-2 border rounded dark:bg-gray-600 dark:text-white"
                         />
+                        <label className="flex items-center">
+                            <input
+                                type="checkbox"
+                                checked={showCompletedTasks}
+                                onChange={(e) => setShowCompletedTasks(e.target.checked)}
+                                className="mr-2"
+                            />
+                            Erledigte Aufgaben anzeigen
+                        </label>
+                        <button onClick={() => setDarkMode(!darkMode)} className="bg-gray-300 text-gray-800 px-4 py-2 rounded hover:bg-gray-400 transition duration-300 dark:bg-gray-600 dark:text-white">
+                            {darkMode ? 'Heller Modus' : 'Dunkler Modus'}
+                        </button>
+                        <button onClick={exportTasks} className="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600 transition duration-300">
+                            Exportieren
+                        </button>
+                        <label className="bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600 transition duration-300 cursor-pointer">
+                            Importieren
+                            <input type="file" onChange={importTasks} className="hidden" accept=".json" />
+                        </label>
                     </div>
 
-                    <div className="space-y-4">
+                    <div ref={taskListRef} className="space-y-4 max-h-96 overflow-y-auto custom-scrollbar">
                         {filteredTasks.map(task => (
-                            <div key={task.id} className={`p-4 rounded shadow ${task.status === 'Erledigt' ? 'bg-green-100' : 'bg-white'}`}>
+                            <div key={task.id} className={`p-4 rounded shadow task-card animate-fade-in ${task.status === 'Erledigt' ? 'bg-green-100 dark:bg-green-800' : 'bg-white dark:bg-gray-700'}`}>
                                 <h3 className="text-lg font-semibold">{task.feature}: {task.description}</h3>
                                 <p>Status: {task.status}</p>
                                 <p>Priorität: {task.priority}</p>
                                 <p>Fälligkeitsdatum: {task.dueDate}</p>
                                 <div className="mt-2 space-x-2">
-                                    <button onClick={() => toggleStatus(task.id)} className="bg-blue-500 text-white px-2 py-1 rounded">
+                                    <button onClick={() => toggleStatus(task.id)} className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600 transition duration-300">
                                         Status umschalten
                                     </button>
-                                    <button onClick={() => deleteTask(task.id)} className="bg-red-500 text-white px-2 py-1 rounded">
+                                    <button onClick={() => deleteTask(task.id)} className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600 transition duration-300">
                                         Löschen
                                     </button>
-                                    <button onClick={() => addSubtask(task.id)} className="bg-purple-500 text-white px-2 py-1 rounded">
+                                    <button onClick={() => addSubtask(task.id)} className="bg-purple-500 text-white px-2 py-1 rounded hover:bg-purple-600 transition duration-300">
                                         Unteraufgabe hinzufügen
                                     </button>
                                 </div>
@@ -314,7 +411,7 @@
                                                     </span>
                                                     <button
                                                         onClick={() => toggleSubtaskStatus(task.id, subtask.id)}
-                                                        className="ml-2 bg-gray-300 text-gray-800 px-2 py-1 rounded text-sm"
+                                                        className="ml-2 bg-gray-300 text-gray-800 px-2 py-1 rounded text-sm hover:bg-gray-400 transition duration-300 dark:bg-gray-600 dark:text-white"
                                                     >
                                                         {subtask.status === 'Erledigt' ? 'Wiedereröffnen' : 'Erledigt'}
                                                     </button>
@@ -327,20 +424,26 @@
                         ))}
                     </div>
 
-                    <div className="mt-8 p-4 bg-white rounded shadow">
+                    <div className="mt-8 p-4 bg-white rounded shadow dark:bg-gray-700">
                         <h3 className="text-lg font-semibold mb-2">Offene Aufgaben aus vorherigen Wochen</h3>
                         <div className="space-y-2">
                             {getOpenTasksFromPreviousWeeks().map(task => (
-                                <div key={task.id} className="p-2 bg-yellow-100 rounded">
+                                <div key={task.id} className="p-2 bg-yellow-100 rounded dark:bg-yellow-800">
                                     <p><strong>Woche {task.week}:</strong> {task.feature} - {task.description}</p>
                                 </div>
                             ))}
                         </div>
                     </div>
 
-                    <div className="mt-4 p-4 bg-gray-100 rounded">
+                    <div className="mt-4 p-4 bg-gray-100 rounded dark:bg-gray-600">
                         <p className="text-center italic">{quote}</p>
                     </div>
+
+                    {showNotification && (
+                        <div className="fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg animate-fade-in">
+                            {notificationMessage}
+                        </div>
+                    )}
                 </div>
             );
         }
