@@ -28,7 +28,7 @@ const taskSchema = new mongoose.Schema({
     priority: String,
     dueDate: String,
     status: String,
-    subtasks: [{ description: String, status: String }] // Unteraufgaben im richtigen Format definieren
+    subtasks: Array
 });
 
 const Task = mongoose.model('Task', taskSchema);
@@ -37,13 +37,13 @@ const Task = mongoose.model('Task', taskSchema);
 app.post('/tasks', async (req, res) => {
     const task = new Task(req.body);
     await task.save();
-    res.json({ message: 'Aufgabe gespeichert!' });
+    res.json({ message: 'Aufgabe gespeichert!' }); // Hier als JSON zurückgeben
 });
 
 // API-Endpunkt zum Abrufen von Aufgaben
 app.get('/tasks', async (req, res) => {
     const tasks = await Task.find();
-    res.json(tasks);
+    res.json(tasks); // Tasks werden als JSON zurückgegeben
 });
 
 // API-Endpunkt zum Umschalten des Status einer Aufgabe
@@ -69,7 +69,7 @@ app.delete('/tasks/:id', async (req, res) => {
     const { id } = req.params;
     try {
         await Task.findByIdAndDelete(id);
-        res.status(204).send();
+        res.status(204).send(); // Erfolgreiche Löschung ohne Rückgabewert
     } catch (error) {
         res.status(404).json({ message: "Aufgabe nicht gefunden" });
     }
@@ -78,7 +78,7 @@ app.delete('/tasks/:id', async (req, res) => {
 // API-Endpunkt zum Hinzufügen einer Unteraufgabe
 app.post('/tasks/:id/subtasks', async (req, res) => {
     const { id } = req.params;
-    const { description } = req.body;
+    const { description } = req.body; // Stelle sicher, dass du die Beschreibung hier bekommst
     try {
         const task = await Task.findById(id);
         if (!task) {
@@ -86,7 +86,7 @@ app.post('/tasks/:id/subtasks', async (req, res) => {
         }
         task.subtasks.push({ description, status: 'Offen' });
         await task.save();
-        res.json(task);
+        res.json(task); // Rückgabe der aktualisierten Aufgabe
     } catch (error) {
         res.status(500).json({ message: "Fehler beim Hinzufügen der Unteraufgabe" });
     }
@@ -107,7 +107,7 @@ app.patch('/tasks/:taskId/subtasks/:subtaskId/toggle', async (req, res) => {
             return res.status(404).json({ message: 'Unteraufgabe nicht gefunden' });
         }
 
-        // Status umschalten
+        // Toggle the status of the subtask
         subtask.status = subtask.status === 'Offen' ? 'Erledigt' : 'Offen';
         await task.save();
 

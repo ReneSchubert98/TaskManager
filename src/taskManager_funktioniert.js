@@ -1,8 +1,5 @@
 const { useState, useEffect, useCallback } = React;
 
-// API-URL
-const API_URL = "http://localhost:5001/tasks";
-
 // Utility functions
 const getCurrentWeek = () => {
     const now = new Date();
@@ -12,12 +9,26 @@ const getCurrentWeek = () => {
 
 const calculateProgress = (tasks, currentWeek) => {
     if (!tasks[currentWeek]) return 0;
-    const totalItems = tasks[currentWeek].reduce((acc, task) => acc + 1 + (task.subtasks ? task.subtasks.length : 0), 0);
+    const totalItems = tasks[currentWeek].reduce((acc, task) => acc + 1 + task.subtasks.length, 0);
     const completedItems = tasks[currentWeek].reduce((acc, task) => {
-        const completedSubtasks = task.subtasks ? task.subtasks.filter(st => st.status === 'Erledigt').length : 0;
+        const completedSubtasks = task.subtasks.filter(st => st.status === 'Erledigt').length;
         return acc + (task.status === 'Erledigt' ? 1 : 0) + completedSubtasks;
     }, 0);
     return totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
+};
+
+const getOpenTasksFromPreviousWeeks = (tasks, currentWeek) => {
+    const openTasks = [];
+    for (let week in tasks) {
+        if (parseInt(week) < currentWeek) {
+            tasks[week].forEach(task => {
+                if (task.status === 'Offen') {
+                    openTasks.push({ ...task, week: parseInt(week) });
+                }
+            });
+        }
+    }
+    return openTasks;
 };
 
 // Custom hooks
@@ -58,20 +69,6 @@ const useNotification = () => {
     return { showNotification, notificationMessage, notify };
 };
 
-const getOpenTasksFromPreviousWeeks = (tasks, currentWeek) => {
-    const openTasks = [];
-    for (let week in tasks) {
-        if (parseInt(week) < currentWeek) {
-            tasks[week].forEach(task => {
-                if (task.status === 'Offen') {
-                    openTasks.push({ ...task, week: parseInt(week) });
-                }
-            });
-        }
-    }
-    return openTasks;
-};
-
 // Main component
 function TaskManager() {
     const [tasks, setTasks] = useLocalStorage('tasks', {});
@@ -82,125 +79,88 @@ function TaskManager() {
     const { showNotification, notificationMessage, notify } = useNotification();
 
     useEffect(() => {
-        async function fetchTasks() {
-            const response = await fetch(API_URL);
-            if (response.ok) {
-                const data = await response.json();
-                setTasks(prevTasks => ({ ...prevTasks, [currentWeek]: data }));
-            } else {
-                console.error('Fehler beim Abrufen der Aufgaben:', response.statusText);
-            }
-        }
-        fetchTasks();
         updateQuote();
     }, [currentWeek]);
 
-    const addTask = useCallback(async (e) => {
-        e.preventDefault();
+    const addTask = useCallback(() => {
         if (newTask.feature && newTask.description) {
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newTask),
-            });
-            
-            if (response.ok) {
-                const task = await response.json();
-                setTasks(prevTasks => {
-                    const updatedTasks = { ...prevTasks };
-                    if (!updatedTasks[currentWeek]) {
-                        updatedTasks[currentWeek] = [];
-                    }
-                    updatedTasks[currentWeek].push(task);
-                    return updatedTasks;
+            setTasks(prevTasks => {
+                const updatedTasks = { ...prevTasks };
+                if (!updatedTasks[currentWeek]) {
+                    updatedTasks[currentWeek] = [];
+                }
+                updatedTasks[currentWeek].push({
+                    ...newTask,
+                    id: Date.now(),
+                    status: 'Offen',
+                    subtasks: []
                 });
-                notify('Aufgabe erfolgreich hinzugefügt');
-            } else {
-                console.error('Fehler beim Hinzufügen der Aufgabe:', await response.text());
-            }
+                return updatedTasks;
+            });
+            setNewTask({ feature: '', description: '', priority: 'Niedrig', dueDate: '' });
+            notify('Aufgabe erfolgreich hinzugefügt');
         }
     }, [newTask, currentWeek, notify]);
 
-    const deleteTask = useCallback(async (taskId) => {
-        const response = await fetch(`${API_URL}/${taskId}`, { method: 'DELETE' });
-        if (response.ok) {
-            setTasks(prevTasks => {
-                const updatedTasks = { ...prevTasks };
-                updatedTasks[currentWeek] = updatedTasks[currentWeek].filter(task => task._id !== taskId);
-                return updatedTasks;
-            });
-            notify('Aufgabe gelöscht');
-        } else {
-            console.error('Fehler beim Löschen der Aufgabe:', await response.text());
-        }
+    const deleteTask = useCallback((taskId) => {
+        setTasks(prevTasks => {
+            const updatedTasks = { ...prevTasks };
+            updatedTasks[currentWeek] = updatedTasks[currentWeek].filter(task => task.id !== taskId);
+            return updatedTasks;
+        });
+        notify('Aufgabe gelöscht');
     }, [currentWeek, notify]);
-    
-    const toggleStatus = useCallback(async (taskId) => {
-        const response = await fetch(`${API_URL}/${taskId}/toggle`, { method: 'PATCH' });
-        if (response.ok) {
-            const updatedTask = await response.json();
-            setTasks(prevTasks => {
-                const updatedTasks = { ...prevTasks };
-                const taskIndex = updatedTasks[currentWeek].findIndex(task => task._id === taskId);
-                if (taskIndex !== -1) {
-                    updatedTasks[currentWeek][taskIndex] = updatedTask;
+
+    const toggleStatus = useCallback((taskId) => {
+        setTasks(prevTasks => {
+            const updatedTasks = { ...prevTasks };
+            const taskIndex = updatedTasks[currentWeek].findIndex(task => task.id === taskId);
+            if (taskIndex !== -1) {
+                const task = updatedTasks[currentWeek][taskIndex];
+                task.status = task.status === 'Offen' ? 'Erledigt' : 'Offen';
+                if (task.status === 'Erledigt') {
+                    task.subtasks.forEach(subtask => subtask.status = 'Erledigt');
                 }
-                return updatedTasks;
-            });
-        } else {
-            console.error('Fehler beim Umschalten des Status:', await response.text());
-        }
+            }
+            return updatedTasks;
+        });
     }, [currentWeek]);
-    
-    const addSubtask = useCallback(async (taskId) => {
+
+    const addSubtask = useCallback((taskId) => {
         const subtaskDescription = prompt("Beschreibung der Unteraufgabe:");
         if (subtaskDescription) {
-            const response = await fetch(`${API_URL}/${taskId}/subtasks`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ description: subtaskDescription }),
-            });
-    
-            if (response.ok) {
-                const updatedTask = await response.json();
-                setTasks(prevTasks => {
-                    const updatedTasks = { ...prevTasks };
-                    const taskIndex = updatedTasks[currentWeek].findIndex(task => task._id === taskId);
-                    if (taskIndex !== -1) {
-                        updatedTasks[currentWeek][taskIndex] = updatedTask;
-                    }
-                    return updatedTasks;
-                });
-                notify('Unteraufgabe hinzugefügt');
-            } else {
-                console.error('Fehler beim Hinzufügen der Unteraufgabe:', await response.text());
-            }
-        }
-    }, [currentWeek, notify]);
-    
-    const toggleSubtaskStatus = useCallback(async (taskId, subtaskId) => {
-        if (!subtaskId) {
-            console.error('Subtask ID ist undefined');
-            return;
-        }
-    
-        // Stelle sicher, dass die API-URL korrekt ist
-        const response = await fetch(`${API_URL}/${taskId}/subtasks/${subtaskId}/toggle`, { method: 'PATCH' });
-        
-        if (response.ok) {
-            const updatedTask = await response.json();
             setTasks(prevTasks => {
                 const updatedTasks = { ...prevTasks };
-                const taskIndex = updatedTasks[currentWeek].findIndex(task => task._id === taskId);
+                const taskIndex = updatedTasks[currentWeek].findIndex(task => task.id === taskId);
                 if (taskIndex !== -1) {
-                    updatedTasks[currentWeek][taskIndex] = updatedTask;
+                    updatedTasks[currentWeek][taskIndex].subtasks.push({
+                        id: Date.now(),
+                        description: subtaskDescription,
+                        status: 'Offen'
+                    });
                 }
                 return updatedTasks;
             });
-        } else {
-            const errorMessage = await response.text(); // Hole die Fehlermeldung
-            console.error('Fehler beim Umschalten des Status der Unteraufgabe:', errorMessage);
+            notify('Unteraufgabe hinzugefügt');
         }
+    }, [currentWeek, notify]);
+
+    const toggleSubtaskStatus = useCallback((taskId, subtaskId) => {
+        setTasks(prevTasks => {
+            const updatedTasks = { ...prevTasks };
+            const taskIndex = updatedTasks[currentWeek].findIndex(task => task.id === taskId);
+            if (taskIndex !== -1) {
+                const subtaskIndex = updatedTasks[currentWeek][taskIndex].subtasks.findIndex(subtask => subtask.id === subtaskId);
+                if (subtaskIndex !== -1) {
+                    const subtask = updatedTasks[currentWeek][taskIndex].subtasks[subtaskIndex];
+                    subtask.status = subtask.status === 'Offen' ? 'Erledigt' : 'Offen';
+                    
+                    const allSubtasksCompleted = updatedTasks[currentWeek][taskIndex].subtasks.every(st => st.status === 'Erledigt');
+                    updatedTasks[currentWeek][taskIndex].status = allSubtasksCompleted ? 'Erledigt' : 'Offen';
+                }
+            }
+            return updatedTasks;
+        });
     }, [currentWeek]);
 
     const updateQuote = useCallback(() => {
@@ -220,8 +180,8 @@ function TaskManager() {
     }, [currentWeek]);
 
     const filteredTasks = tasks[currentWeek] ? tasks[currentWeek].filter(task =>
-        (task.feature && task.feature.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (task.description && task.description.toLowerCase().includes(searchTerm.toLowerCase()))
+        task.feature.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        task.description.toLowerCase().includes(searchTerm.toLowerCase())
     ) : [];
 
     return (
@@ -229,7 +189,7 @@ function TaskManager() {
             <h1 className="text-3xl font-bold mb-4">ReDIX Task Manager</h1>
             
             <div className="mb-4 flex justify-between items-center">
-            <button onClick={() => setCurrentWeek(prev => prev - 1)} className="bg-blue-500 text-white px-4 py-2 rounded">
+                <button onClick={() => setCurrentWeek(prev => prev - 1)} className="bg-blue-500 text-white px-4 py-2 rounded">
                     Vorherige Woche
                 </button>
                 <h2 className="text-xl font-semibold">Kalenderwoche {currentWeek}</h2>
@@ -297,19 +257,19 @@ function TaskManager() {
 
             <div className="space-y-4">
                 {filteredTasks.map(task => (
-                    <div key={task._id} className={`p-4 rounded shadow ${task.status === 'Erledigt' ? 'bg-green-100' : 'bg-white'}`}>
+                    <div key={task.id} className={`p-4 rounded shadow ${task.status === 'Erledigt' ? 'bg-green-100' : 'bg-white'}`}>
                         <h3 className="text-lg font-semibold">{task.feature}: {task.description}</h3>
                         <p>Status: {task.status}</p>
                         <p>Priorität: {task.priority}</p>
                         <p>Fälligkeitsdatum: {task.dueDate}</p>
                         <div className="mt-2 space-x-2">
-                            <button onClick={() => toggleStatus(task._id)} className="bg-blue-500 text-white px-2 py-1 rounded">
+                            <button onClick={() => toggleStatus(task.id)} className="bg-blue-500 text-white px-2 py-1 rounded">
                                 Status umschalten
                             </button>
-                            <button onClick={() => deleteTask(task._id)} className="bg-red-500 text-white px-2 py-1 rounded">
+                            <button onClick={() => deleteTask(task.id)} className="bg-red-500 text-white px-2 py-1 rounded">
                                 Löschen
                             </button>
-                            <button onClick={() => addSubtask(task._id)} className="bg-purple-500 text-white px-2 py-1 rounded">
+                            <button onClick={() => addSubtask(task.id)} className="bg-purple-500 text-white px-2 py-1 rounded">
                                 Unteraufgabe hinzufügen
                             </button>
                         </div>
@@ -318,12 +278,12 @@ function TaskManager() {
                                 <h4 className="font-semibold">Unteraufgaben:</h4>
                                 <ul className="list-disc list-inside">
                                     {task.subtasks.map(subtask => (
-                                        <li key={subtask._id} className="flex items-center">
+                                        <li key={subtask.id} className="flex items-center">
                                             <span className={subtask.status === 'Erledigt' ? 'line-through' : ''}>
                                                 {subtask.description}
                                             </span>
                                             <button
-                                                onClick={() => toggleSubtaskStatus(task._id, subtask._id)}
+                                                onClick={() => toggleSubtaskStatus(task.id, subtask.id)}
                                                 className="ml-2 bg-gray-300 text-gray-800 px-2 py-1 rounded text-sm"
                                             >
                                                 {subtask.status === 'Erledigt' ? 'Wiedereröffnen' : 'Erledigt'}
@@ -341,7 +301,7 @@ function TaskManager() {
                 <h3 className="text-lg font-semibold mb-2">Offene Aufgaben aus vorherigen Wochen</h3>
                 <div className="space-y-2">
                     {getOpenTasksFromPreviousWeeks(tasks, currentWeek).map(task => (
-                        <div key={task._id} className="p-2 bg-yellow-100 rounded">
+                        <div key={task.id} className="p-2 bg-yellow-100 rounded">
                             <p><strong>Woche {task.week}:</strong> {task.feature} - {task.description}</p>
                         </div>
                     ))}

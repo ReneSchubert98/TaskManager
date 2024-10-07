@@ -1,7 +1,7 @@
 const { useState, useEffect, useCallback } = React;
 
 // API-URL
-const API_URL = "http://localhost:5001/tasks";
+const API_URL = "http://localhost:5001/tasks"; // Ändere dies bei Bedarf für den öffentlichen Server
 
 // Utility functions
 const getCurrentWeek = () => {
@@ -18,6 +18,20 @@ const calculateProgress = (tasks, currentWeek) => {
         return acc + (task.status === 'Erledigt' ? 1 : 0) + completedSubtasks;
     }, 0);
     return totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
+};
+
+const getOpenTasksFromPreviousWeeks = (tasks, currentWeek) => {
+    const openTasks = [];
+    for (let week in tasks) {
+        if (parseInt(week) < currentWeek) {
+            tasks[week].forEach(task => {
+                if (task.status === 'Offen') {
+                    openTasks.push({ ...task, week: parseInt(week) });
+                }
+            });
+        }
+    }
+    return openTasks;
 };
 
 // Custom hooks
@@ -58,20 +72,6 @@ const useNotification = () => {
     return { showNotification, notificationMessage, notify };
 };
 
-const getOpenTasksFromPreviousWeeks = (tasks, currentWeek) => {
-    const openTasks = [];
-    for (let week in tasks) {
-        if (parseInt(week) < currentWeek) {
-            tasks[week].forEach(task => {
-                if (task.status === 'Offen') {
-                    openTasks.push({ ...task, week: parseInt(week) });
-                }
-            });
-        }
-    }
-    return openTasks;
-};
-
 // Main component
 function TaskManager() {
     const [tasks, setTasks] = useLocalStorage('tasks', {});
@@ -96,9 +96,9 @@ function TaskManager() {
     }, [currentWeek]);
 
     const addTask = useCallback(async (e) => {
-        e.preventDefault();
+        e.preventDefault(); // Verhindert das Standardverhalten
         if (newTask.feature && newTask.description) {
-            const response = await fetch(API_URL, {
+            const response = await fetch(`${API_URL}/tasks`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(newTask),
@@ -115,8 +115,6 @@ function TaskManager() {
                     return updatedTasks;
                 });
                 notify('Aufgabe erfolgreich hinzugefügt');
-            } else {
-                console.error('Fehler beim Hinzufügen der Aufgabe:', await response.text());
             }
         }
     }, [newTask, currentWeek, notify]);
@@ -131,7 +129,8 @@ function TaskManager() {
             });
             notify('Aufgabe gelöscht');
         } else {
-            console.error('Fehler beim Löschen der Aufgabe:', await response.text());
+            const errorMessage = await response.text(); // Hole die Fehlermeldung
+            console.error('Fehler beim Löschen der Aufgabe:', errorMessage);
         }
     }, [currentWeek, notify]);
     
@@ -148,7 +147,8 @@ function TaskManager() {
                 return updatedTasks;
             });
         } else {
-            console.error('Fehler beim Umschalten des Status:', await response.text());
+            const errorMessage = await response.text(); // Hole die Fehlermeldung
+            console.error('Fehler beim Umschalten des Status:', errorMessage);
         }
     }, [currentWeek]);
     
@@ -173,7 +173,8 @@ function TaskManager() {
                 });
                 notify('Unteraufgabe hinzugefügt');
             } else {
-                console.error('Fehler beim Hinzufügen der Unteraufgabe:', await response.text());
+                const errorMessage = await response.text(); // Hole die Fehlermeldung
+                console.error('Fehler beim Hinzufügen der Unteraufgabe:', errorMessage);
             }
         }
     }, [currentWeek, notify]);
@@ -184,9 +185,7 @@ function TaskManager() {
             return;
         }
     
-        // Stelle sicher, dass die API-URL korrekt ist
-        const response = await fetch(`${API_URL}/${taskId}/subtasks/${subtaskId}/toggle`, { method: 'PATCH' });
-        
+        const response = await fetch(`${API_URL}/tasks/${taskId}/subtasks/${subtaskId}/toggle`, { method: 'PATCH' });
         if (response.ok) {
             const updatedTask = await response.json();
             setTasks(prevTasks => {
@@ -198,11 +197,10 @@ function TaskManager() {
                 return updatedTasks;
             });
         } else {
-            const errorMessage = await response.text(); // Hole die Fehlermeldung
-            console.error('Fehler beim Umschalten des Status der Unteraufgabe:', errorMessage);
+            console.error('Fehler beim Umschalten des Status der Unteraufgabe:', response.statusText);
         }
     }, [currentWeek]);
-
+    
     const updateQuote = useCallback(() => {
         const quotes = [
             "Der beste Weg, die Zukunft vorherzusagen, ist, sie zu erschaffen.",
@@ -323,7 +321,7 @@ function TaskManager() {
                                                 {subtask.description}
                                             </span>
                                             <button
-                                                onClick={() => toggleSubtaskStatus(task._id, subtask._id)}
+                                                onClick={() => toggleSubtaskStatus(task._id, subtask._id)} // Stelle sicher, dass die IDs hier korrekt sind
                                                 className="ml-2 bg-gray-300 text-gray-800 px-2 py-1 rounded text-sm"
                                             >
                                                 {subtask.status === 'Erledigt' ? 'Wiedereröffnen' : 'Erledigt'}
