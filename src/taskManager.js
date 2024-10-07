@@ -1,7 +1,7 @@
 const { useState, useEffect, useCallback } = React;
 
 // API-URL
-const API_URL = "http://localhost:5001/tasks";
+const API_URL = "http://localhost:5001/";
 
 // Utility functions
 const getCurrentWeek = () => {
@@ -122,7 +122,7 @@ function TaskManager() {
     }, [newTask, currentWeek, notify]);
 
     const deleteTask = useCallback(async (taskId) => {
-        const response = await fetch(`${API_URL}/${taskId}`, { method: 'DELETE' });
+        const response = await fetch(`${API_URL}/tasks/${taskId}`, { method: 'DELETE' });
         if (response.ok) {
             setTasks(prevTasks => {
                 const updatedTasks = { ...prevTasks };
@@ -136,7 +136,7 @@ function TaskManager() {
     }, [currentWeek, notify]);
     
     const toggleStatus = useCallback(async (taskId) => {
-        const response = await fetch(`${API_URL}/${taskId}/toggle`, { method: 'PATCH' });
+        const response = await fetch(`${API_URL}/tasks/${taskId}/toggle`, { method: 'PATCH' });
         if (response.ok) {
             const updatedTask = await response.json();
             setTasks(prevTasks => {
@@ -155,7 +155,7 @@ function TaskManager() {
     const addSubtask = useCallback(async (taskId) => {
         const subtaskDescription = prompt("Beschreibung der Unteraufgabe:");
         if (subtaskDescription) {
-            const response = await fetch(`${API_URL}/${taskId}/subtasks`, {
+            const response = await fetch(`${API_URL}/tasks/${taskId}/subtasks`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ description: subtaskDescription }),
@@ -185,7 +185,7 @@ function TaskManager() {
         }
     
         // Stelle sicher, dass die API-URL korrekt ist
-        const response = await fetch(`${API_URL}/${taskId}/subtasks/${subtaskId}/toggle`, { method: 'PATCH' });
+        const response = await fetch(`${API_URL}/tasks/${taskId}/subtasks/${subtaskId}/toggle`, { method: 'PATCH' });
         
         if (response.ok) {
             const updatedTask = await response.json();
@@ -313,7 +313,7 @@ function TaskManager() {
                                 Unteraufgabe hinzufügen
                             </button>
                         </div>
-                        {task.subtasks.length > 0 && (
+                        {task.subtasks && task.subtasks.length > 0 && (
                             <div className="mt-2">
                                 <h4 className="font-semibold">Unteraufgaben:</h4>
                                 <ul className="list-disc list-inside">
