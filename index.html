@@ -20,36 +20,91 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useCallback } = React;
 
+        // Utility functions
+        const getCurrentWeek = () => {
+            const now = new Date();
+            const onejan = new Date(now.getFullYear(), 0, 1);
+            return Math.ceil((((now - onejan) / 86400000) + onejan.getDay() + 1) / 7);
+        };
+
+        const calculateProgress = (tasks, currentWeek) => {
+            if (!tasks[currentWeek]) return 0;
+            const totalItems = tasks[currentWeek].reduce((acc, task) => acc + 1 + task.subtasks.length, 0);
+            const completedItems = tasks[currentWeek].reduce((acc, task) => {
+                const completedSubtasks = task.subtasks.filter(st => st.status === 'Erledigt').length;
+                return acc + (task.status === 'Erledigt' ? 1 : 0) + completedSubtasks;
+            }, 0);
+            return totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
+        };
+
+        const getOpenTasksFromPreviousWeeks = (tasks, currentWeek) => {
+            const openTasks = [];
+            for (let week in tasks) {
+                if (parseInt(week) < currentWeek) {
+                    tasks[week].forEach(task => {
+                        if (task.status === 'Offen') {
+                            openTasks.push({ ...task, week: parseInt(week) });
+                        }
+                    });
+                }
+            }
+            return openTasks;
+        };
+
+        // Custom hooks
+        const useLocalStorage = (key, initialValue) => {
+            const [storedValue, setStoredValue] = useState(() => {
+                try {
+                    const item = window.localStorage.getItem(key);
+                    return item ? JSON.parse(item) : initialValue;
+                } catch (error) {
+                    console.log(error);
+                    return initialValue;
+                }
+            });
+
+            const setValue = value => {
+                try {
+                    const valueToStore = value instanceof Function ? value(storedValue) : value;
+                    setStoredValue(valueToStore);
+                    window.localStorage.setItem(key, JSON.stringify(valueToStore));
+                } catch (error) {
+                    console.log(error);
+                }
+            };
+
+            return [storedValue, setValue];
+        };
+
+        const useNotification = () => {
+            const [showNotification, setShowNotification] = useState(false);
+            const [notificationMessage, setNotificationMessage] = useState('');
+
+            const notify = useCallback((message) => {
+                setNotificationMessage(message);
+                setShowNotification(true);
+                setTimeout(() => setShowNotification(false), 3000);
+            }, []);
+
+            return { showNotification, notificationMessage, notify };
+        };
+
+        // Main component
         function TaskManager() {
-            const [tasks, setTasks] = useState({});
+            const [tasks, setTasks] = useLocalStorage('tasks', {});
             const [currentWeek, setCurrentWeek] = useState(getCurrentWeek());
             const [newTask, setNewTask] = useState({ feature: '', description: '', priority: 'Niedrig', dueDate: '' });
             const [quote, setQuote] = useState('');
             const [searchTerm, setSearchTerm] = useState('');
-            const [showNotification, setShowNotification] = useState(false);
-            const [notificationMessage, setNotificationMessage] = useState('');
+            const { showNotification, notificationMessage, notify } = useNotification();
 
             useEffect(() => {
-                const storedTasks = localStorage.getItem('tasks');
-                if (storedTasks) {
-                    setTasks(JSON.parse(storedTasks));
-                }
                 updateQuote();
-            }, []);
+            }, [currentWeek]);
 
-            useEffect(() => {
-                localStorage.setItem('tasks', JSON.stringify(tasks));
-            }, [tasks]);
-
-            function getCurrentWeek() {
-                const now = new Date();
-                const onejan = new Date(now.getFullYear(), 0, 1);
-                return Math.ceil((((now - onejan) / 86400000) + onejan.getDay() + 1) / 7);
-            }
-
-            function addTask() {
+            const addTask = useCallback(() => {
                 if (newTask.feature && newTask.description) {
                     setTasks(prevTasks => {
                         const updatedTasks = { ...prevTasks };
@@ -65,20 +120,20 @@
                         return updatedTasks;
                     });
                     setNewTask({ feature: '', description: '', priority: 'Niedrig', dueDate: '' });
-                    showNotification('Aufgabe erfolgreich hinzugefügt');
+                    notify('Aufgabe erfolgreich hinzugefügt');
                 }
-            }
+            }, [newTask, currentWeek, notify]);
 
-            function deleteTask(taskId) {
+            const deleteTask = useCallback((taskId) => {
                 setTasks(prevTasks => {
                     const updatedTasks = { ...prevTasks };
                     updatedTasks[currentWeek] = updatedTasks[currentWeek].filter(task => task.id !== taskId);
                     return updatedTasks;
                 });
-                showNotification('Aufgabe gelöscht');
-            }
+                notify('Aufgabe gelöscht');
+            }, [currentWeek, notify]);
 
-            function toggleStatus(taskId) {
+            const toggleStatus = useCallback((taskId) => {
                 setTasks(prevTasks => {
                     const updatedTasks = { ...prevTasks };
                     const taskIndex = updatedTasks[currentWeek].findIndex(task => task.id === taskId);
@@ -91,9 +146,9 @@
                     }
                     return updatedTasks;
                 });
-            }
+            }, [currentWeek]);
 
-            function addSubtask(taskId) {
+            const addSubtask = useCallback((taskId) => {
                 const subtaskDescription = prompt("Beschreibung der Unteraufgabe:");
                 if (subtaskDescription) {
                     setTasks(prevTasks => {
@@ -108,11 +163,11 @@
                         }
                         return updatedTasks;
                     });
-                    showNotification('Unteraufgabe hinzugefügt');
+                    notify('Unteraufgabe hinzugefügt');
                 }
-            }
+            }, [currentWeek, notify]);
 
-            function toggleSubtaskStatus(taskId, subtaskId) {
+            const toggleSubtaskStatus = useCallback((taskId, subtaskId) => {
                 setTasks(prevTasks => {
                     const updatedTasks = { ...prevTasks };
                     const taskIndex = updatedTasks[currentWeek].findIndex(task => task.id === taskId);
@@ -128,9 +183,9 @@
                     }
                     return updatedTasks;
                 });
-            }
+            }, [currentWeek]);
 
-            function updateQuote() {
+            const updateQuote = useCallback(() => {
                 const quotes = [
                     "Der beste Weg, die Zukunft vorherzusagen, ist, sie zu erschaffen.",
                     "Erfolg ist nicht final, Misserfolg ist nicht fatal: Es ist der Mut weiterzumachen, der zählt.",
@@ -144,42 +199,12 @@
                     "Wer aufhört, besser werden zu wollen, hört auf, gut zu sein."
                 ];
                 setQuote(quotes[currentWeek % quotes.length]);
-            }
-
-            function calculateProgress() {
-                if (!tasks[currentWeek]) return 0;
-                const totalItems = tasks[currentWeek].reduce((acc, task) => acc + 1 + task.subtasks.length, 0);
-                const completedItems = tasks[currentWeek].reduce((acc, task) => {
-                    const completedSubtasks = task.subtasks.filter(st => st.status === 'Erledigt').length;
-                    return acc + (task.status === 'Erledigt' ? 1 : 0) + completedSubtasks;
-                }, 0);
-                return totalItems > 0 ? (completedItems / totalItems) * 100 : 0;
-            }
-
-            function getOpenTasksFromPreviousWeeks() {
-                const openTasks = [];
-                for (let week in tasks) {
-                    if (parseInt(week) < currentWeek) {
-                        tasks[week].forEach(task => {
-                            if (task.status === 'Offen') {
-                                openTasks.push({ ...task, week: parseInt(week) });
-                            }
-                        });
-                    }
-                }
-                return openTasks;
-            }
+            }, [currentWeek]);
 
             const filteredTasks = tasks[currentWeek] ? tasks[currentWeek].filter(task =>
                 task.feature.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 task.description.toLowerCase().includes(searchTerm.toLowerCase())
             ) : [];
-
-            function showNotification(message) {
-                setNotificationMessage(message);
-                setShowNotification(true);
-                setTimeout(() => setShowNotification(false), 3000);
-            }
 
             return (
                 <div className="container mx-auto p-4">
@@ -235,9 +260,9 @@
                         <div className="w-full bg-gray-200 rounded">
                             <div
                                 className="bg-blue-500 text-xs font-medium text-blue-100 text-center p-0.5 leading-none rounded"
-                                style={{ width: `${calculateProgress()}%` }}
+                                style={{ width: `${calculateProgress(tasks, currentWeek)}%` }}
                             >
-                                {calculateProgress().toFixed(1)}%
+                                {calculateProgress(tasks, currentWeek).toFixed(1)}%
                             </div>
                         </div>
                     </div>
@@ -297,7 +322,7 @@
                     <div className="mt-8 p-4 bg-white rounded shadow">
                         <h3 className="text-lg font-semibold mb-2">Offene Aufgaben aus vorherigen Wochen</h3>
                         <div className="space-y-2">
-                            {getOpenTasksFromPreviousWeeks().map(task => (
+                            {getOpenTasksFromPreviousWeeks(tasks, currentWeek).map(task => (
                                 <div key={task.id} className="p-2 bg-yellow-100 rounded">
                                     <p><strong>Woche {task.week}:</strong> {task.feature} - {task.description}</p>
                                 </div>
